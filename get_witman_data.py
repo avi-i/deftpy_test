@@ -5,6 +5,7 @@ import adjustText
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+from pymatgen.analysis.local_env import CrystalNN
 from pymatgen.core import Structure, Composition
 from sklearn.linear_model import HuberRegressor
 from tqdm import tqdm
@@ -87,7 +88,7 @@ def main():
     for defectid in tqdm(df["defectid"].unique()):
         df_defectid = df[df["defectid"] == defectid]
         structure = df_defectid["structure"].iloc[0]
-        crystal = Crystal(pymatgen_structure=structure)
+        crystal = Crystal(pymatgen_structure=structure, nn_finder=CrystalNN(weighted_cn=True, cation_anion=True), use_weights=True)
 
         CN = crystal.cn_dicts
         Eb = crystal.bond_dissociation_enthalpies
@@ -107,6 +108,7 @@ def main():
                 Vr_max.append(max(Vr_dict.values()))
             except ValueError:
                 Vr_max.append(np.nan)
+        #print(Vr_max)
 
         # Make a dataframe
         formula = df_defectid["formula"].values
@@ -135,6 +137,8 @@ def main():
             )
         except ValueError:
             pass
+    #print(df_cf)
+    #exit(4)
     df_cf = df_cf.reset_index(drop=True)
     #df_cf.to_csv("witman_data_w_Ehull.csv", index=False)
 
@@ -149,23 +153,27 @@ def main():
     cfm.fit(X, y)
     y_pred = cfm.predict(X)
     coefs = cfm.coef_
-    print(coefs)
-    exit(4)
+    #print(coefs)
+    #exit(4)
     df_cf['y_pred'] = y_pred
 
-    unique_formulas = df_cf['formula'].unique()
-    num_unique_formulas = len(unique_formulas)
-    colors = plt.cm.plasma(np.linspace(0, 1, num_unique_formulas))
-    #plt.scatter(y, y_pred)
-    for i, formula in enumerate(unique_formulas):
-        formula_data = df_cf[df_cf['formula'] == formula]
-        plt.scatter(formula_data["Ev"], formula_data["y_pred"], color=colors[i], label=formula)
-    plt.plot([1, 9], [1, 9], "k--")
+    #unique_formulas = df_cf['formula'].unique()
+    #num_unique_formulas = len(unique_formulas)
+    #colors = plt.cm.plasma(np.linspace(0, 1, num_unique_formulas))
+    #fig, axs = plt.subplots(1, 1)
+    #axs.scatter(y, y_pred)
+    #for i, formula in enumerate(unique_formulas):
+        #formula_data = df_cf[df_cf['formula'] == formula]
+        #plt.scatter(formula_data["Ev"], formula_data["y_pred"], color=colors[i], label=formula)
+    #plt.plot([1, 9], [1, 9], "k--")
     #equation = f"$E_v$ = {cfm.intercept_:.2f} + {cfm.coef_[0]:.2f} $V_r$ + {cfm.coef_[1]:.2f} $E_g$"
     #equation = f"$E_v$ = {cfm.intercept_:.2f} + {cfm.coef_[0]:.2f} $\\Sigma E_b$ + {cfm.coef_[1]:.2f} $V_r$ + {cfm.coef_[2]:.2f} $E_g$"
     equation = f"$E_v$ = {cfm.intercept_:.2f} + {cfm.coef_[0]:.2f} $\\Sigma E_b$ + {cfm.coef_[1]:.2f} $V_r$ + {cfm.coef_[2]:.2f} $E_g$ + {cfm.coef_[3]:.2f} $E_h$"
-    plt.text(1, 9, equation, fontsize=9)
+    print(equation)
+    #plt.text(1, 9, equation, fontsize=9)
     mae = np.mean(np.abs(y - y_pred))
+    print(mae)
+    exit(4)
     plt.text(1, 8, f"MAE = {mae:.2f} eV", fontsize=9)
     # add number of data points as text
     plt.text(1, 7, f"n = {len(y)}", fontsize=9)
@@ -177,7 +185,7 @@ def main():
     plt.xlabel(str(equation))
     plt.ylabel(f"$E_v$")
     plt.legend(bbox_to_anchor=(1.1, 1.3), prop={'size': 3.5})
-    plt.savefig("witman_fit_dH_3.png", dpi=300)
+    plt.savefig("witman_fit_weights.png", dpi=300)
 
 
 if __name__ == "__main__":
