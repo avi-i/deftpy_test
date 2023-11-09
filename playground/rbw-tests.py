@@ -4,7 +4,7 @@ from pymatgen.analysis.local_env import CrystalNN
 from pymatgen.core import Species
 from pymatgen.core.structure import Structure
 
-EB = pd.read_csv("../data/Eb.csv")
+EB = pd.read_csv("../deftpy/Eb.csv")
 VR = pd.read_csv("../data/VR.csv")
 
 

@@ -16,6 +16,7 @@ EB_DICT = {"filepath": "../data/Eb.csv", "column_name": "Eb", "comparison": "os"
 VR_DICT = {"filepath": "../data/Vr.csv", "column_name": "Vr", "comparison": "n"}
 
 
+
 class Crystal:
     """
     A class for analyzing crystal structures.

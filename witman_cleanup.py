@@ -1,4 +1,3 @@
-""" Get crystal features for structures in Matt Witman's Nature Computational Science Paper """
 from glob import glob
 
 import adjustText
@@ -84,7 +83,8 @@ def main():
     #df["is_binary_or_ternary"] = df["formula"].apply(lambda x: 2 <= len(Composition(x).elements) <= 4)
     # Sort by defectid and then by site
     df = df.sort_values(["defectid", "site"])
-    df.to_csv("oxygen_vacancies.csv", index=False)
+
+    #df.to_csv("oxygen_vacancies.csv", index=False)
 
     # Calculate crystal features for binary structures
     #df = df[df["is_binary"]]
@@ -105,9 +105,9 @@ def main():
         # Calculate CN-weighted Eb sum
         Eb_sum = []
         for CN_dict, Eb_dict in zip(CN, Eb):
-            CN_array = np.array(list(CN_dict.values()))
-            Eb_array = np.array(list(Eb_dict.values()))
-            Eb_sum.append(np.sum(CN_array * Eb_array))
+                CN_array = np.array(list(CN_dict.values()))
+                Eb_array = np.array(list(Eb_dict.values()))
+                Eb_sum.append(np.sum(CN_array * Eb_array))
 
         # Calculate maximum Vr
         Vr_max = []
@@ -148,11 +148,8 @@ def main():
     #print(df_cf)
     #exit(4)
     df_cf = df_cf.reset_index(drop=True)
-    df_cf.to_csv("witman_data_find_Na.csv", index=False)
-    exit(3)
+    df_cf.to_csv("witman_data_cleanup.csv", index=False)
 
-    # plot witman-based cfm
-    # remove NaNs
     df_cf = df_cf.dropna()
     cfm = HuberRegressor()
     #X = df_cf[["Vr_max", "Eg"]]
@@ -162,82 +159,16 @@ def main():
     cfm.fit(X, y)
     y_pred = cfm.predict(X)
     coefs = cfm.coef_
-    #print(coefs)
+    print(coefs)
     #exit(4)
     df_cf['y_pred'] = y_pred
 
-    plt.style.use("seaborn")
-    plt.scatter(y_pred, y)
-    plt.plot([1, 9], [1, 9], "k--")
-
-    #unique_formulas = df_cf['formula'].unique()
-    #num_unique_formulas = len(unique_formulas)
-    #colors = plt.cm.plasma(np.linspace(0, 1, num_unique_formulas))
-    #fig, axs = plt.subplots(1, 1)
-    #axs.scatter(y, y_pred)
-    #for i, formula in enumerate(unique_formulas):
-        #formula_data = df_cf[df_cf['formula'] == formula]
-        #plt.style.use("seaborn-poster")
-        #plt.scatter(formula_data["y_pred"], formula_data["Ev"], color=colors[i], label=formula)
-    plt.plot([1, 9], [1, 9], "k--")
-
-    #eq for Vr and Eg only
-    #equation = f"$E_v$ = {cfm.intercept_:.2f} + {cfm.coef_[0]:.2f} $V_r$ + {cfm.coef_[1]:.2f} $E_g$"
-    #Eq for Eb, Vr, and Eg
-    #equation = f"$E_v$ = {cfm.intercept_:.2f} + {cfm.coef_[0]:.2f} $\\Sigma E_b$ + {cfm.coef_[1]:.2f} $V_r$ + {cfm.coef_[2]:.2f} $E_g$"
-    #Eq for all variables
     equation = f"$E_v$ = {cfm.intercept_:.2f} + {cfm.coef_[0]:.2f} $\\Sigma E_b$ + {cfm.coef_[1]:.2f} $V_r$ + {cfm.coef_[2]:.2f} $E_g$ + {cfm.coef_[3]:.2f} $E_h_u_l_l$"
-    #plt.text(1, 7.5, equation, fontsize=14)
+    print(equation)
     mae = np.mean(np.abs(y - y_pred))
-    plt.text(1, 8, f"MAE = {mae:.2f} eV", fontsize=14)
-    #binary
-    #oxides = f"$MO_x$"
-    #binary and ternary
-    oxides = f"$MO_x$, $ABO_x$"
-    plt.text(1, 8.5, oxides, fontsize=14)
-    # add number of data points as text
-    plt.text(1, 7.5, f"n = {len(y)}", fontsize=14)
-    #texts = []
-    #for x, y, s in zip(y, y_pred, df_cf["formula"]):
-         #texts.append(plt.text(x, y, s, size=6))
-    #adjustText.adjust_text(texts, arrowprops=dict(arrowstyle="-", color="k", lw=0.5))
-    plt.xlabel(str(equation))
-    plt.ylabel(f"$E_v$")
-    plt.title("CFM for binary and ternary oxides without weighting")
-    #plt.legend(bbox_to_anchor=(1.1, 1.0), prop={'size': 8})
-    #plt.text(1.1, 0.9, "each color represents a unique defect id")
-    plt.show()
-    #plt.savefig("witman_fit_ternary_no_weights.png", dpi=300)
-    exit(3)
-
-    import plotly.express as px
-    import plotly.graph_objects as go
-
-# Create the scatter plot figure
-    fig = px.scatter(df_cf, x='Ev', y='y_pred', color='formula',
-                 labels={'formula': 'Formula'},
-                 hover_data=['Ev', 'y_pred', 'formula'])
-
-# Add text annotation with the pre-calculated MAE value
-    fig.add_trace(go.Scatter(x=[2], y=[7],
-                         mode='text',
-                         text=[f'MAE: {mae:.2f}'],
-                         textfont=dict(size=14, color='black')))
-
-    eq = f'E<sub>v</sub> = {cfm.intercept_:.2f} + {cfm.coef_[0]:.2f} \sigma E<sub>b</sub> + {cfm.coef_[1]:.2f} V<sub>r</sub> + {cfm.coef_[2]:.2f} E<sub>g</sub> + {cfm.coef_[3]:.2f} E<sub>h</sub>'
-    fig.add_trace(go.Scatter(x=[2], y=[7.5],
-                             mode='text',
-                             text=eq,
-                             textfont=dict(size=14, color='black')))
-# Customize the layout
-    # Replace this with your desired y-axis label
-    fig.update_layout(title='CFM for neutral oxygen vacancy formation with weighted coordination numbers',
-                  xaxis_title='Ev',
-                  yaxis_title=eq)
-
-# Show the interactive plot
-    fig.show()
-
+    print(mae)
+    n = f"n = {len(y)}"
+    print(n)
 
 if __name__ == "__main__":
     main()
