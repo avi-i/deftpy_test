@@ -77,24 +77,29 @@ def main():
     #df.drop(columns=['dH_eV_per_atom_min'], inplace=True)
 
     # Binary?
-    #df["is_binary"] = df["formula"].apply(lambda x: len(Composition(x).elements) == 2)
+    df["is_binary"] = df["formula"].apply(lambda x: len(Composition(x).elements) == 2)
     # Ternary?
-    df["is_binary_or_ternary"] = df["formula"].apply(lambda x: 2 <= len(Composition(x).elements) <= 3)
+    #df["is_binary_or_ternary"] = df["formula"].apply(lambda x: 2 <= len(Composition(x).elements) <= 3)
     #test to see if all had been included via composition elements seen in fit4
     #df["is_binary_or_ternary"] = df["formula"].apply(lambda x: 2 <= len(Composition(x).elements) <= 4)
     # Sort by defectid and then by site
     df = df.sort_values(["defectid", "site"])
-    df.to_csv("oxygen_vacancies.csv", index=False)
+    # df.to_csv("oxygen_vacancies.csv", index=False)
 
     # Calculate crystal features for binary structures
-    #df = df[df["is_binary"]]
-    df = df[df["is_binary_or_ternary"]]
+    df = df[df["is_binary"]]
+    #df = df[df["is_binary_or_ternary"]]
     df_cf = pd.DataFrame()
     for defectid in tqdm(df["defectid"].unique()):
         df_defectid = df[df["defectid"] == defectid]
         structure = df_defectid["structure"].iloc[0]
-        crystal = Crystal(pymatgen_structure=structure, nn_finder=CrystalNN(weighted_cn=True, cation_anion=True), use_weights=True)
-        #crystal = Crystal(pymatgen_structure=structure)
+        print(structure)
+        exit(34)
+        #crystal = Crystal(pymatgen_structure=structure, nn_finder=CrystalNN(weighted_cn=True, cation_anion=True), use_weights=True)
+        crystal = Crystal(pymatgen_structure=structure)
+        print(structure)
+        print(df_defectid["structure"].iloc[0])
+        exit(5)
 
         #crystal.structure.to(filename="AlCoO_nw.VASP", fmt="poscar")
 
@@ -148,7 +153,7 @@ def main():
     #print(df_cf)
     #exit(4)
     df_cf = df_cf.reset_index(drop=True)
-    df_cf.to_csv("witman_data_find_Na.csv", index=False)
+    df_cf.to_csv("witman_data_binary_nw.csv", index=False)
     exit(3)
 
     # plot witman-based cfm
