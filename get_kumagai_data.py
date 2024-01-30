@@ -80,6 +80,10 @@ def main():
     plt.xlim(min(df_corr_merge['vacancy_formation_energy_charge0']) - 1, max(df_corr_merge['vacancy_formation_energy_charge0']) + 1)
     plt.ylim(min(df_corr_merge['vacancy_formation_energy_charge1']) - 1, max(df_corr_merge['vacancy_formation_energy_charge1']) + 1)
     #plt.plot([0, 6], [1, 9], "k--")
+    x = df_corr_merge["vacancy_formation_energy_charge0"]
+    y = df_corr_merge["vacancy_formation_energy_charge1"]
+    correlation_coefficient = np.corrcoef(x, y)[0, 1]
+    plt.text(1.5, 5.0, f'Correlation: {correlation_coefficient:.2f}', fontsize=12)
     plt.gca().set_aspect('equal', adjustable='box')
     plt.text(2, 5.5, f"n = {len(df_corr_merge['full_name'])}", size=14)
     plt.xlabel('Neutral Vacancy Formation Energy')
