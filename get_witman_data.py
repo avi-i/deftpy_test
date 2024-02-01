@@ -93,8 +93,6 @@ def main():
     for defectid in tqdm(df["defectid"].unique()):
         df_defectid = df[df["defectid"] == defectid]
         structure = df_defectid["structure"].iloc[0]
-        print(structure)
-        exit(34)
         #crystal = Crystal(pymatgen_structure=structure, nn_finder=CrystalNN(weighted_cn=True, cation_anion=True), use_weights=True)
         crystal = Crystal(pymatgen_structure=structure)
         print(structure)

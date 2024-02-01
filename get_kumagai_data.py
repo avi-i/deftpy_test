@@ -5,6 +5,7 @@ from glob import glob
 
 import matplotlib.pyplot as plt
 import pandas as pd
+from pymatgen.io.cif import CifParser
 from pymatgen.io.vasp import Poscar
 from sklearn import linear_model
 from sklearn.metrics import mean_absolute_error
@@ -56,8 +57,10 @@ def main():
     df_plot.to_csv("Kumagai_binary_clean.csv")
     #exit(4)
 
-    df_low_charge = df_plot[df_plot["charge"] != 2]
-    df_corr = df_low_charge[df_low_charge.duplicated("full_name", keep=False) & ~df_low_charge.duplicated(['full_name', 'charge'], keep=False)]
+    '''df_low_charge = df_plot[df_plot["charge"] != 2]
+    df_corr = df_low_charge[
+        df_low_charge.duplicated("full_name", keep=False) & ~df_low_charge.duplicated(['full_name', 'charge'],
+                                                                                      keep=False)]
     df_corr.to_csv("Kumagai_binary_charge_corr.csv")
     # Create a scatter plot
     plt.figure(figsize=(10, 6))
@@ -65,10 +68,28 @@ def main():
     df_charge0 = df_corr[df_corr['charge'] == 0]
     # Merge the DataFrames based on 'full_name'
     df_corr_merge = pd.merge(df_charge0, df_charge1, on='full_name', suffixes=('_charge0', '_charge1'))
-    df_corr_merge.to_csv("kumagai_plot_attempt.csv")
+    #df_corr_merge.to_csv("kumagai_plot_attempt.csv")
+    metals = []
+    for _, row in df_corr_merge.iterrows():
+        full_name = row["full_name"]
+        formula = row["formula_charge1"]
+        composition = Composition(formula)
+        metal = [el.symbol for el in composition.elements if el.symbol != "O"][0]
+        metals.append(metal)
+    df_corr_merge["metal"] = metals
 
     # Create a scatter plot
     plt.figure(figsize=(10, 8))
+    df_corr_merge["group"] = df_corr_merge["metal"].apply(lambda x: Element(x).group)
+    unique_groups = df_corr_merge["group"].unique()
+    num_unique_groups = len(unique_groups)
+    colors = plt.cm.plasma(np.linspace(0, 1, num_unique_groups))
+
+    for i, full_name in enumerate(df_corr_merge):
+        formula_data = df_corr_merge[df_corr_merge['full_name'] == full_name]
+        plt.scatter(formula_data['vacancy_formation_energy_charge0'], formula_data['vacancy_formation_energy_charge1'],
+                    color=colors[i], label=df_corr_merge["metal"])
+    #using unique formulas subset using color
     unique_formulas = df_corr['full_name'].unique()
     num_unique_formulas = len(unique_formulas)
     colors = plt.cm.plasma(np.linspace(0, 1, num_unique_formulas))
@@ -77,9 +98,12 @@ def main():
         formula_data = df_corr_merge[df_corr_merge['full_name'] == formula]
         plt.scatter(formula_data['vacancy_formation_energy_charge0'], formula_data['vacancy_formation_energy_charge1'],
                     color=colors[i], label=formula)
-    plt.xlim(min(df_corr_merge['vacancy_formation_energy_charge0']) - 1, max(df_corr_merge['vacancy_formation_energy_charge0']) + 1)
-    plt.ylim(min(df_corr_merge['vacancy_formation_energy_charge1']) - 1, max(df_corr_merge['vacancy_formation_energy_charge1']) + 1)
-    #plt.plot([0, 6], [1, 9], "k--")
+
+    plt.xlim(min(df_corr_merge['vacancy_formation_energy_charge0']) - 1,
+             max(df_corr_merge['vacancy_formation_energy_charge0']) + 1)
+    plt.ylim(min(df_corr_merge['vacancy_formation_energy_charge1']) - 1,
+             max(df_corr_merge['vacancy_formation_energy_charge1']) + 1)
+    # plt.plot([0, 6], [1, 9], "k--")
     x = df_corr_merge["vacancy_formation_energy_charge0"]
     y = df_corr_merge["vacancy_formation_energy_charge1"]
     correlation_coefficient = np.corrcoef(x, y)[0, 1]
@@ -90,8 +114,9 @@ def main():
     plt.ylabel('Charged +1 Vacancy Formation Energy')
     plt.title('Vacancy Formation Energy for Different Charges')
     plt.legend(bbox_to_anchor=(1.0, 1.0), prop={'size': 8})
-    plt.show()
-    exit(123)
+    #plt.savefig("kumagai_neutral_charged_VFE_correlation_groups.png")
+    #plt.show()
+    #exit(123)'''
 
     # Calculate crystal reduction potentials
     n_atoms = []  # number of atoms in the compound formula
@@ -114,64 +139,64 @@ def main():
     df_plot["n_metal"] = n_metals
     df_plot["oxi_state"] = oxi_states
     df_plot["vr"] = df_plot["n_atoms"] * df_plot["formation_energy"] / df_plot["n_metal"] / df_plot["oxi_state"]
+    #print(df_plot[["formula", "metal", "oxi_state"]])
 
-    ''' @timeout(14)  # Adjust the timeout value as needed
-    def process_iteration(i):
-        structures = []
-        Eb_sum = []
-        for defect in tqdm(df_plot["vacancy_formation_energy"].unique()):
-            # these four lines might be unnecessary ... idrk
-            df_defect = df_plot[df_plot["vacancy_formation_energy"] == defect]
-            full_name = df_defect["full_name"].iloc[0]
-            formula = df_defect["formula"].iloc[0]
-            charge = df_plot["charge"].iloc[0]
+    # using corrected structure files
+    structures = []
+    Eb_sum = []
 
-            # Open the outer tar.gz file
-            with tarfile.open(glob(data_path + "oxygen_vacancies_db_data/" + formula + ".tar.gz")[0],
-                              "r:gz") as outer_tar:
-                # Specify the path to the inner tar.gz file within the outer tar.gz file
-                inner_tar_path = str(str(formula) + "/" + str(full_name) + "_" + str(charge) + ".tar.gz")
-
-                # Extract the inner tar.gz file from the outer tar.gz file
-                inner_tar_info = outer_tar.getmember(inner_tar_path)
-                inner_tar_file = outer_tar.extractfile(inner_tar_info)
-
-                # Open the inner tar.gz file
-                with tarfile.open(fileobj=inner_tar_file, mode="r:gz") as inner_tar:
-                    # obtain the contcar file
-                    d = inner_tar.extractfile("CONTCAR-finish")
-                    contcar = d.read().decode("utf-8")
-                    poscar = Poscar.from_str(contcar)
-                    # crystal = Crystal(poscar_string=poscar)
-                    # pass poscar to a structure object
-                    structure = poscar.structure
-                    # assign oxidation states
-                    oxi_states = {"O": -2, str(df_plot.loc[df_plot['full_name'] == full_name, "metal"].iloc[0]): float(
-                        df_plot.loc[df_plot['full_name'] == full_name, "oxi_state"].iloc[0])}
+    for defect in tqdm(df_plot["vacancy_formation_energy"].unique()):
+        df_defect = df_plot[df_plot["vacancy_formation_energy"] == defect]
+        #print(df_defect)
+        formula = df_defect["formula"].iloc[0]
+        #print(formula)
+        full_name = df_defect["full_name"].iloc[0]
+        #print(full_name)
+        metal = df_defect["metal"].iloc[0]
+        #print(metal)
+        oxi_state_metal = df_defect["oxi_state"].iloc[0]
+        #print(oxi_state_metal)
+        with tarfile.open(glob(data_path + "site_info.tar.gz")[0], "r:gz") as tar:
+            tar.extractall(path=data_path)
+            #print("tarred file extracted")
+            cif_path = os.path.join(data_path, "site_info", formula, "supercell.cif")
+            #print(cif_path)
+            if os.path.exists(cif_path):
+                #print("path exisits")
+                parser = CifParser(cif_path)
+                #print(parser)
+                parser_list = parser.get_structures()
+                print(len(parser_list))
+                #print(len(parser_list))
+                if parser_list:
+                    structure = parser.get_structures()[0]
+                    #print("structure obtained")
+                #oxi_states = {"O": -2, str(df_plot.loc[df_plot['full_name'] == full_name, "metal"]): float(
+                    #df_plot.loc[df_plot['full_name'] == full_name, "oxi_state"].iloc[0])}
+                    oxi_states = {"O": -2, metal: oxi_state_metal}
                     structure_copy = structure.copy()
                     structure_copy.add_oxidation_state_by_element(oxidation_states=oxi_states)
-                    # print(structure_copy)
-                    if i == 2:
-                        crystal = Crystal(pymatgen_structure=structure_copy)
-                        pass
-                    else:
-                        structures.append(crystal)
-                    # print(structures)
-                        CN = crystal.cn_dicts
-                        Eb = crystal.bond_dissociation_enthalpies
-                        # Vr = crystal.reduction_potentials
+                    #print("ox states added")
+                    structures.append(structure)
+                    crystal = Crystal(pymatgen_structure=structure_copy)
+                    #print("structure passed to crystal object")
 
-                    # Calculate CN-weighted Eb sum
+                    CN = crystal.cn_dicts
+                    Eb = crystal.bond_dissociation_enthalpies
 
-                        for CN_dict, Eb_dict in zip(CN, Eb):
-                            CN_array = np.array(list(CN_dict.values()))
-                            Eb_array = np.array(list(Eb_dict.values()))
-                            Eb_sum.append(np.sum(CN_array * Eb_array))
-                        pass
-
-
-
-        print(f"Processed iteration {i}")'''
+                    Eb_sum = []
+                    for CN_dict, Eb_dict in zip(CN, Eb):
+                        CN_array = np.array(list(CN_dict.values()))
+                        Eb_array = np.array(list(Eb_dict.values()))
+                        Eb_sum.append(np.sum(CN_array * Eb_array))
+                    print("length is " + str(len(Eb_sum)))
+                else:
+                    print(f"Error: List empty - {parser_list}")
+            else:
+                print(f"Error: File not found - {cif_path}")
+    df_plot["Eb_sum"] = Eb_sum
+    print(df_plot["Eb_sum"])
+    exit(234)
 
     # calculate sum Eb
     structures = []
